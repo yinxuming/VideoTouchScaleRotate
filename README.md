@@ -2,12 +2,10 @@
 视频播放画面双指旋转、缩放、平移以及回弹动效实现
 
 [toc]
+
 文章索引
-
-[Android 视频手势缩放与回弹动效实现（一）](https://github.com/yinxuming/VideoTouchScale/blob/master/README.md)：主要是实现视频双指：缩放、平移、回弹动效
-[Android 视频旋转、缩放与回弹动效实现（二）](https://github.com/yinxuming/VideoTouchScaleRotate/blob/main/README.md)：主要是实现视频双指：**旋转**、缩放、平移、回弹动效
-
-
+1. [Android 视频手势缩放与回弹动效实现（一）](https://github.com/yinxuming/VideoTouchScale/blob/master/README.md)：主要是实现视频双指：缩放、平移、回弹动效
+1. [Android 视频旋转、缩放与回弹动效实现（二）](https://github.com/yinxuming/VideoTouchScaleRotate/blob/main/README.md)：主要是实现视频双指：**旋转**、缩放、平移、回弹动效
 
 # Android 视频旋转、缩放与回弹动效实现（二）
 
