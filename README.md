@@ -2,6 +2,13 @@
 视频播放画面双指旋转、缩放、平移以及回弹动效实现
 
 [toc]
+文章索引
+
+[Android 视频手势缩放与回弹动效实现（一）](https://github.com/yinxuming/VideoTouchScale/blob/master/README.md)：主要是实现视频双指：缩放、平移、回弹动效
+[Android 视频旋转、缩放与回弹动效实现（二）](https://github.com/yinxuming/VideoTouchScaleRotate/blob/main/README.md)：主要是实现视频双指：**旋转**、缩放、平移、回弹动效
+
+
+
 # Android 视频旋转、缩放与回弹动效实现（二）
 
 在[Android 视频手势缩放与回弹动效实现（一）](https://github.com/yinxuming/VideoTouchScale/blob/master/README.md)中我们实现了下列1-5部分的需求，事实上对于双指手势触摸，不仅可以缩放、平移，还可以进行**旋转**，现在我们就在原有基础上进行改造，添加**视频手势旋转**及**回弹动效**，来实现需求6。
@@ -49,17 +56,21 @@
 2. **旋转角度**
    旋转角度的计算稍微比较复杂，我们需要先计算**当前双指连线的夹角degrees**, 来**减去上一次我们记录的手指连线夹角lastDegrees**，才能得到本次旋转的角度**diffDegree = degrees - lastDegrees**。如图所示：
    
+
 ![avatar](doc/rotate_degrees.png)
-   
+
 双指连线夹角`degrees`如何计算呢？
-   
+
    这里我们需要获取到双指分别在x、y轴上的分量$\Delta x, \Delta y$，组成的三角形，由于$tan(\theta)=\frac{\Delta y}{\Delta x}$通过计算夹角的反正切三角函数arctangent得到偏移角度$\theta=arctan \frac{\Delta y}{\Delta x}$。几个注意的小点：
-   
+
    1. `Math.atan2(y, x)`和`Math.atan(v)`差异。
+
     都能计算反正切，为了**避免除数为0**的情况（当然还有其它差别，如结果范围不同），我们一般选用`Math.atan2(y, x)`
    2. `Math.atan2(y, x)`结果。
+
     计算结果值为**弧度**，取值范围**[-Math.PI, Math.PI]**，由于旋转操作`Matrix.postRotate`传入的参数为具体角度，所以我们需要将**弧度**通过`Math.toDegrees`转换为**角度** [-180, 180]。
    3. 分母**微小抖动**带来的**角度剧烈变化**。
+
     试想一下$\frac{\Delta y}{\Delta x}$，当$\Delta y$一定情况下，$\Delta x$轴偏移量稍微变化点点，都会引起角度剧烈变化，显然不符合用户的真实意图，所以对于超过45度的变化，我们可以认为只改变少许角度，这里取值正负5度。
    4. 旋转角度`diffDegree`>0，则通过`Matrix.postRotate`传入角度进行旋转，结果为正数是**顺时针旋转**，否则是逆时针旋转
    ```java
