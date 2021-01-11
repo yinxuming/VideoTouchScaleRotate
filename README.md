@@ -386,10 +386,10 @@ public class VideoTouchRotateHandler implements IVideoRotateHandler, RotateGestu
 整个视频手势缩放、旋转、位移最难处理的部分，应该就是计算回弹动效了。实现回弹动效主要有两种思路：
 
 1. 回弹动效思路一
-   已知当前画面的位置`startAnimMatrix`，要进行回弹动效到最终位置，主要做了2
-   类操作，**位移**和**旋转**，也就是我们只需要计算出**位移补偿**和**旋转角度补偿**，就可以构造属性动画，进行线性渐变位移与旋转。实际在使用时，该方案有一些问题，缩小时不一定完全居中，推测可能是计算位移补偿时，是先进行旋转，再计算位移补偿，而实际使用时，动画是一边执行旋转，一边执行位移，导致位移的值不准确。
+    已知当前画面的位置`startAnimMatrix`，要进行回弹动效到最终位置，主要做了2类操作，**位移**和**旋转**，也就是我们只需要计算出**位移补偿**和**旋转角度补偿**，就可以构造属性动画，进行线性渐变位移与旋转。实际在使用时，该方案有一些问题，缩小时不一定完全居中，推测可能是计算位移补偿时，是先进行旋转，再计算位移补偿，而实际使用时，动画是一边执行旋转，一边执行位移，导致位移的值不准确。
+   
 2. 回弹动效思路二
-   这里还有一种思路，参考[自定义可旋转、平移、缩放的ImageView](https://www.jianshu.com/p/938ca88fb16a)或[PinchImageView](https://github.com/boycy815/PinchImageView/blob/master/pinchimageview/src/main/java/com/boycy815/pinchimageview/PinchImageView.java)。它的主要思路，也是已知`startAnimMatrix`，然后关注点变成直接去计算出**动效结束矩阵`endAnimMatrix`**，然后动画执行时去操作矩阵`Matrix`上9个分量的值，使`startAnimMatrix`最终达到`endAnimMatrix`。
+    这里还有一种思路，参考[自定义可旋转、平移、缩放的ImageView](https://www.jianshu.com/p/938ca88fb16a)或[PinchImageView](https://github.com/boycy815/PinchImageView/blob/master/pinchimageview/src/main/java/com/boycy815/pinchimageview/PinchImageView.java)。它的主要思路，也是已知`startAnimMatrix`，然后关注点变成直接去计算出**动效结束矩阵`endAnimMatrix`**，然后动画执行时去操作矩阵`Matrix`上9个分量的值，使`startAnimMatrix`最终达到`endAnimMatrix`。
 
 这里我们主要按思路二进行回弹动效实现，需要解决以下几个问题:
 1. 动效触发的时机
