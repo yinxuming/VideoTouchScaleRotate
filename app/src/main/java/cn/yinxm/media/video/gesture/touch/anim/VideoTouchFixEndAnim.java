@@ -1,5 +1,6 @@
 package cn.yinxm.media.video.gesture.touch.anim;
 
+import android.animation.ValueAnimator;
 import android.graphics.Matrix;
 import android.graphics.PointF;
 import android.graphics.RectF;
@@ -17,7 +18,7 @@ import cn.yinxm.media.video.gesture.touch.adapter.IVideoTouchAdapter;
 public class VideoTouchFixEndAnim implements IVideoTouchEndAnim {
 
     private IVideoTouchAdapter mTouchAdapter;
-    private VideoScaleEndAnimator mAnimator;
+    private ValueAnimator mAnimator;
     float mScale = 1.0f;
     float mCurrentRotateDegrees;
     float mRotateEndFixDegrees;
@@ -64,10 +65,10 @@ public class VideoTouchFixEndAnim implements IVideoTouchEndAnim {
     }
 
     /**
-     * 计算transAnimX、transAnimY，生成动画对象
+     * 计算transAnimX、transAnimY 得到endAnimMatrix，生成动画对象
      * @return
      */
-    private VideoScaleEndAnimator makeFixEndAnimator() {
+    private ValueAnimator makeFixEndAnimator() {
         TextureView mTextureView = mTouchAdapter.getTextureView();
         // 动画 start矩阵：当前画面变换
         Matrix currentTransformMatrix = mTextureView.getTransform(null);
@@ -114,14 +115,14 @@ public class VideoTouchFixEndAnim implements IVideoTouchEndAnim {
         if (transAnimX == 0 && transAnimY == 0 && fixDegrees == 0) {
             return null;
         } else {
-            VideoScaleEndAnimator animator = new VideoScaleEndAnimator() {
+            ScaleRotateEndAnimator animator = new ScaleRotateEndAnimator() {
                 @Override
                 protected void updateMatrixToView(Matrix transMatrix) {
-                    mTouchAdapter.getTextureView().setTransform(mStartMatrix);
+                    mTouchAdapter.getTextureView().setTransform(transMatrix);
                 }
 
                 @Override
-                protected void onFixEndAnim(VideoScaleEndAnimator animator, float fixEndDegrees) {
+                protected void onFixEndAnim(ValueAnimator animator, float fixEndDegrees) {
                     mTouchAdapter.getVideoRotateHandler().fixRotateEndAnim(fixEndDegrees);
                     if (animator == mAnimator) {
                         mAnimator = null;
@@ -129,7 +130,7 @@ public class VideoTouchFixEndAnim implements IVideoTouchEndAnim {
                     }
                 }
             };
-            animator.setScaleEndAnimParams(currentTransformMatrix, transAnimX, transAnimY, fixDegrees, center);
+            animator.setScaleEndAnimParams(currentTransformMatrix, endAnimMatrix, fixDegrees);
             return animator;
         }
     }

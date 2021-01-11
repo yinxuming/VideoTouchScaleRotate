@@ -386,11 +386,12 @@ public class VideoTouchRotateHandler implements IVideoRotateHandler, RotateGestu
 整个视频手势缩放、旋转、位移最难处理的部分，应该就是计算回弹动效了。实现回弹动效主要有两种思路：
 
 1. 回弹动效思路一
-   已知当前画面的位置`startAnimMatrix`，要进行回弹动效到最终位置，主要做了2类操作，**位移**和**旋转**，也就是我们只需要计算出**位移补偿**和**旋转角度补偿**，就可以构造属性动画，进行线性渐变位移与旋转。
+   已知当前画面的位置`startAnimMatrix`，要进行回弹动效到最终位置，主要做了2
+   类操作，**位移**和**旋转**，也就是我们只需要计算出**位移补偿**和**旋转角度补偿**，就可以构造属性动画，进行线性渐变位移与旋转。实际在使用时，该方案有一些问题，缩小时不一定完全居中，推测可能是计算位移补偿时，是先进行旋转，再计算位移补偿，而实际使用时，动画是一边执行旋转，一边执行位移，导致位移的值不准确。
 2. 回弹动效思路二
-   这里还有一种思路，参考[自定义可旋转、平移、缩放的ImageView](https://www.jianshu.com/p/938ca88fb16a)，感兴趣的同学可以尝试下。它的回弹动效，也是已知`startAnimMatrix`，然后关注点变成直接去计算出**动效结束矩阵`endAnimMatrix`**，然后动画执行时去操作矩阵`Matrix`上9个分量的值，使`startAnimMatrix`最终达到`endAnimMatrix`，这样也是可以的。不过这种方式的中间动画执行结果有点无法预测，因为`Matrix`中9个分量的值，是会受缩放、平移、旋转的**互相叠加**影响。
+   这里还有一种思路，参考[自定义可旋转、平移、缩放的ImageView](https://www.jianshu.com/p/938ca88fb16a)或[PinchImageView](https://github.com/boycy815/PinchImageView/blob/master/pinchimageview/src/main/java/com/boycy815/pinchimageview/PinchImageView.java)。它的主要思路，也是已知`startAnimMatrix`，然后关注点变成直接去计算出**动效结束矩阵`endAnimMatrix`**，然后动画执行时去操作矩阵`Matrix`上9个分量的值，使`startAnimMatrix`最终达到`endAnimMatrix`。
 
-这里我们主要按思路一进行回弹动效实现，需要解决以下几个问题:
+这里我们主要按思路二进行回弹动效实现，需要解决以下几个问题:
 1. 动效触发的时机
 2. 动效参数计算：旋转补偿角度引起`transAnimX`、`transAnimY`的变化如何计算?
 3. 如何处理连续动画：即本次动画还未执行完毕，下次动画已经到来，如何处理?
@@ -456,6 +457,7 @@ onTouchEvent双指触摸事件回调顺序：
 
 ### 回弹动效参数计算：VideoTouchFixEndAnim
 ```java
+
 /**
  * 回弹动效参数计算、动画状态控制
  * <p>
@@ -466,7 +468,7 @@ onTouchEvent双指触摸事件回调顺序：
 public class VideoTouchFixEndAnim implements IVideoTouchEndAnim {
 
     private IVideoTouchAdapter mTouchAdapter;
-    private VideoScaleEndAnimator mAnimator;
+    private ValueAnimator mAnimator;
     float mScale = 1.0f;
     float mCurrentRotateDegrees;
     float mRotateEndFixDegrees;
@@ -513,10 +515,10 @@ public class VideoTouchFixEndAnim implements IVideoTouchEndAnim {
     }
 
     /**
-     * 计算transAnimX、transAnimY，生成动画对象
+     * 计算transAnimX、transAnimY 得到endAnimMatrix，生成动画对象
      * @return
      */
-    private VideoScaleEndAnimator makeFixEndAnimator() {
+    private ValueAnimator makeFixEndAnimator() {
         TextureView mTextureView = mTouchAdapter.getTextureView();
         // 动画 start矩阵：当前画面变换
         Matrix currentTransformMatrix = mTextureView.getTransform(null);
@@ -563,14 +565,14 @@ public class VideoTouchFixEndAnim implements IVideoTouchEndAnim {
         if (transAnimX == 0 && transAnimY == 0 && fixDegrees == 0) {
             return null;
         } else {
-            VideoScaleEndAnimator animator = new VideoScaleEndAnimator() {
+            ScaleRotateEndAnimator animator = new ScaleRotateEndAnimator() {
                 @Override
                 protected void updateMatrixToView(Matrix transMatrix) {
-                    mTouchAdapter.getTextureView().setTransform(mStartMatrix);
+                    mTouchAdapter.getTextureView().setTransform(transMatrix);
                 }
 
                 @Override
-                protected void onFixEndAnim(VideoScaleEndAnimator animator, float fixEndDegrees) {
+                protected void onFixEndAnim(ValueAnimator animator, float fixEndDegrees) {
                     mTouchAdapter.getVideoRotateHandler().fixRotateEndAnim(fixEndDegrees);
                     if (animator == mAnimator) {
                         mAnimator = null;
@@ -578,7 +580,7 @@ public class VideoTouchFixEndAnim implements IVideoTouchEndAnim {
                     }
                 }
             };
-            animator.setScaleEndAnimParams(currentTransformMatrix, transAnimX, transAnimY, fixDegrees, center);
+            animator.setScaleEndAnimParams(currentTransformMatrix, endAnimMatrix, fixDegrees);
             return animator;
         }
     }
@@ -592,46 +594,52 @@ public class VideoTouchFixEndAnim implements IVideoTouchEndAnim {
     }
 }
 
-```
-### 回弹动效执行：VideoScaleEndAnimator
-```java
 
-/**
- * 缩放动画
- * <p>
- * 在给定时间内从一个矩阵的变化逐渐动画到另一个矩阵的变化
- */
-public abstract class VideoScaleEndAnimator extends ValueAnimator implements ValueAnimator.AnimatorUpdateListener,
+```
+### 回弹动效执行：ScaleRotateEndAnimator
+```java
+public abstract class ScaleRotateEndAnimator extends ValueAnimator implements ValueAnimator.AnimatorUpdateListener,
         Animator.AnimatorListener {
+    private static final String TAG = "VideoScaleEndAnimator";
 
     /**
      * 图片缩放动画时间
      */
     public static final int SCALE_ANIMATOR_DURATION = 1000;
 
-    Matrix mStartMatrix = new Matrix();
-    float[] mTransSpan = new float[2];
-    PointF mRotateCenter;
-    float mRotateDegree;
-    float mLastValue;
+    private Matrix mStartMatrix = new Matrix();
+    private Matrix mEndMatrix = new Matrix();
+    private Matrix mMatrix = new Matrix();
+    private float[] mStartMatrixValue;
+    private float[] mInterpolateMatrixValue;
+    private float[] mEndMatrixValue;
+    private float mRotateDegrees;
 
-    public void setScaleEndAnimParams(Matrix startMatrix, float transX, float transY, float rotateFixDegree,
-                                      PointF rotateCenter) {
-        if (startMatrix == null) {
-            mStartMatrix.reset();
-        } else {
-            mStartMatrix.set(startMatrix);
+
+    public void setScaleEndAnimParams(Matrix startMatrix, Matrix endMatrix, float rotateFixDegree) {
+        mStartMatrix = startMatrix;
+        mEndMatrix = endMatrix;
+        mRotateDegrees = rotateFixDegree;
+        mMatrix.reset();
+        if (mStartMatrix == null || mEndMatrix == null) {
+            return;
         }
-        mTransSpan[0] = transX;
-        mTransSpan[1] = transY;
-        mRotateDegree = rotateFixDegree;
-        mRotateCenter = rotateCenter;
+        mStartMatrixValue = new float[9];
+        mStartMatrix.getValues(mStartMatrixValue);
+        mEndMatrixValue = new float[9];
+        mEndMatrix.getValues(mEndMatrixValue);
+        mInterpolateMatrixValue = new float[9];
 
+        setAnimConfig();
+    }
+
+    protected void setAnimConfig() {
         setFloatValues(0, 1f);
         setDuration(SCALE_ANIMATOR_DURATION);
         addUpdateListener(this);
         addListener(this);
     }
+
 
     @Override
     public void onAnimationUpdate(ValueAnimator animation) {
@@ -640,29 +648,23 @@ public abstract class VideoScaleEndAnimator extends ValueAnimator implements Val
         onValueUpdate(value);
     }
 
+
     public void onValueUpdate(float value) {
-        // 计算相对于上次位置的偏移量
-        float transX = mTransSpan[0] * (value - mLastValue);
-        float transY = mTransSpan[1] * (value - mLastValue);
-        boolean isUpdate = false;
-        if (!(transX == 0 && transY == 0)) {
-            mStartMatrix.postTranslate(transX, transY);
-            isUpdate = true;
+        if (mStartMatrix == null
+                || mEndMatrix == null) {
+            return;
         }
-        if (mRotateDegree != 0) {
-            mStartMatrix.postRotate(mRotateDegree * (value - mLastValue), mRotateCenter.x, mRotateCenter.y);
-            isUpdate = true;
+        for (int i = 0; i < 9; i++) {
+            mInterpolateMatrixValue[i] = mStartMatrixValue[i] + (mEndMatrixValue[i] - mStartMatrixValue[i]) * value;
         }
-        if (isUpdate) {
-            updateMatrixToView(mStartMatrix);
-        }
-        mLastValue = value;
+        mMatrix.setValues(mInterpolateMatrixValue);
+        updateMatrixToView(mMatrix);
     }
 
 
     protected abstract void updateMatrixToView(Matrix transMatrix);
 
-    protected abstract void onFixEndAnim(VideoScaleEndAnimator animator, float fixEndDegrees);
+    protected abstract void onFixEndAnim(ValueAnimator animator, float fixEndDegrees);
 
     @Override
     public void onAnimationStart(Animator animation) {
@@ -671,7 +673,7 @@ public abstract class VideoScaleEndAnimator extends ValueAnimator implements Val
     @CallSuper
     @Override
     public void onAnimationEnd(Animator animation) {
-        onFixEndAnim(this, mRotateDegree);
+        onFixEndAnim(this, mRotateDegrees);
     }
 
     @CallSuper
@@ -682,6 +684,7 @@ public abstract class VideoScaleEndAnimator extends ValueAnimator implements Val
     @Override
     public void onAnimationRepeat(Animator animation) {
     }
+
 }
 ```
 # 项目完整代码
